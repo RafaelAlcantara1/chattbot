@@ -114,6 +114,23 @@ function generateConversationTitle(messages) {
 }
 
 // Routes
+app.get('/', (req, res) => {
+  res.json({
+    service: 'mega-chef-api',
+    status: 'ok',
+    docs: '/api/health',
+    endpoints: [
+      'GET /api/health',
+      'GET /api/conversations',
+      'POST /api/conversations',
+      'GET /api/conversations/:id',
+      'POST /api/conversations/:id/messages',
+      'PUT /api/conversations/:id/messages',
+      'PATCH /api/conversations/:id',
+      'DELETE /api/conversations/:id'
+    ]
+  });
+});
 app.get('/api/health', (req, res) => {
   res.json({ ok: true });
 });
@@ -247,7 +264,7 @@ app.patch('/api/conversations/:id', async (req, res) => {
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
-  console.log(`Servidor rodando em http://localhost:${PORT}`);
+  console.log(`Servidor rodando em https://mega-chef-api.onrender.com`);
 });
 
 
