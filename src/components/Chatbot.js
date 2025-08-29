@@ -8,7 +8,7 @@ import { FiSend, FiAlertCircle } from "react-icons/fi";
 // Usando variável de ambiente para API key
 const API_KEY = process.env.REACT_APP_GEMINI_API_KEY || "AIzaSyC3Zzlv5are_c7qayolflfgbRI7WXISadc";
 const WEATHER_API_KEY = process.env.REACT_APP_WEATHER_API_KEY || "236c471e864a13bfe824100061a58d23";
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:4000';
+const API_BASE_URL = 'https://mega-chef-api.onrender.com';
 
 // Constantes para configuração
 const MODELO_IA = "gemini-2.0-flash";
