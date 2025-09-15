@@ -668,8 +668,22 @@
     font-size: 1.5rem;
   }
   
-  .sidebar { display: none; }
-  .chat-body { display: block; }
+  /* Mantém o histórico visível via botão como um painel sobreposto */
+  .chat-body {
+    display: flex;
+    position: relative;
+  }
+
+  .sidebar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 80vw;
+    max-width: 360px;
+    z-index: 20;
+    box-shadow: 2px 0 16px rgba(0,0,0,0.2);
+  }
 
   .message-content {
     max-width: 90%;
