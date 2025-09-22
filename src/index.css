@@ -19,6 +19,24 @@ code {
   min-height: 100vh;
 }
 
+.admin-access-button {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1100;
+  background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
+  color: #fff;
+  text-decoration: none;
+  padding: 10px 14px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(255, 105, 180, 0.35);
+  font-weight: 600;
+}
+
+.admin-access-button:hover {
+  transform: translateY(-1px);
+}
+
 .offline-notification {
   background-color: #FF69B4;
   color: white;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Chatbot from './components/Chatbot';
+import Login from './components/Login';
 import './index.css';
 
 function App() {
@@ -26,7 +27,14 @@ function App() {
           Você está offline. Algumas funcionalidades podem estar indisponíveis.
         </div>
       )}
-      <Chatbot />
+      {window.location.pathname !== '/login' && (
+        <a href="/login" className="admin-access-button">Administrador</a>
+      )}
+      {window.location.pathname === '/login' ? (
+        <Login />
+      ) : (
+        <Chatbot />
+      )}
     </div>
   );
 }
