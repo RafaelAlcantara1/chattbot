@@ -1,21 +1,46 @@
 import React, { useState } from 'react';
 import './Login.css';
 
+const API_BASE_URL = 'https://mega-chef-api.onrender.com';
+
 function Login() {
   const [nome, setNome] = useState('');
   const [senha, setSenha] = useState('');
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [isRegister, setIsRegister] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     
-    // Simular delay de processamento
-    setTimeout(() => {
-      alert('Login de administrador (somente UI). Função será habilitada futuramente.');
+    try {
+      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: nome, password: senha })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao fazer login');
+      }
+
+      // Salvar token e informações do usuário
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      
+      // Redirecionar para o chat
+      window.location.href = '/';
+    } catch (err) {
+      setError(err.message || 'Erro ao processar requisição');
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
   return (
@@ -25,11 +50,22 @@ function Login() {
           <div className="login-avatar">
             <span>🔐</span>
           </div>
-          <h1>Painel do Administrador</h1>
-          <p className="login-subtitle">Acesso restrito</p>
+          <h1>{isRegister ? 'Criar Conta' : 'Login'}</h1>
+          <p className="login-subtitle">{isRegister ? 'Crie sua conta para personalizar o bot' : 'Acesso à personalização'}</p>
         </header>
         <form className="login-form" onSubmit={handleSubmit}>
-          <p className="admin-note">Faça login para continuar</p>
+          {error && (
+            <div className="login-error" style={{ 
+              color: '#d32f2f', 
+              backgroundColor: '#ffebee', 
+              padding: '12px', 
+              borderRadius: '8px', 
+              marginBottom: '16px',
+              fontSize: '0.9rem'
+            }}>
+              {error}
+            </div>
+          )}
 
           <div>
             <label className="login-label" htmlFor="nome">Nome de Usuário</label>
@@ -76,10 +112,25 @@ function Login() {
             className="login-button"
             disabled={loading || !nome || !senha}
           >
-            {loading ? 'Entrando...' : 'Entrar'}
+            {loading ? (isRegister ? 'Criando...' : 'Entrando...') : (isRegister ? 'Criar Conta' : 'Entrar')}
           </button>
         </form>
         <footer className="login-footer">
+          <button
+            type="button"
+            onClick={() => setIsRegister(!isRegister)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#FF1493',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              marginBottom: '8px',
+              fontSize: '0.9rem'
+            }}
+          >
+            {isRegister ? 'Já tem conta? Faça login' : 'Não tem conta? Registre-se'}
+          </button>
           <a href="/" className="login-link">← Voltar ao chat</a>
         </footer>
       </div>

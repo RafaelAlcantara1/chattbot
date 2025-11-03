@@ -50,11 +50,63 @@ const Chatbot = () => {
   const [conversations, setConversations] = useState([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [supportsConversationList, setSupportsConversationList] = useState(true);
+  const [user, setUser] = useState(null);
+  const [personality, setPersonality] = useState(CONTEXTO_INICIAL);
+  const [showPersonalityModal, setShowPersonalityModal] = useState(false);
+  const [personalityEdit, setPersonalityEdit] = useState('');
+  const [isSavingPersonality, setIsSavingPersonality] = useState(false);
   
   // Referências para auto-rolagem e input
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   
+  // Carregar informações do usuário e personalidade
+  useEffect(() => {
+    const loadUserAndPersonality = async () => {
+      const savedUser = localStorage.getItem('user');
+      const token = localStorage.getItem('authToken');
+      
+      if (savedUser && token) {
+        try {
+          const userData = JSON.parse(savedUser);
+          setUser(userData);
+          
+          // Carregar personalidade do usuário
+          try {
+            const response = await fetch(`${API_BASE_URL}/api/personality`, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              setPersonality(data.personality);
+            }
+          } catch (e) {
+            console.error('Erro ao carregar personalidade:', e);
+          }
+        } catch (e) {
+          console.error('Erro ao carregar usuário:', e);
+        }
+      } else {
+        // Usuário não logado, carregar personalidade global pública
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/personality/public`);
+          if (response.ok) {
+            const data = await response.json();
+            setPersonality(data.personality);
+          }
+        } catch (e) {
+          console.error('Erro ao carregar personalidade global:', e);
+          // Usa CONTEXTO_INICIAL como fallback
+        }
+      }
+    };
+    
+    loadUserAndPersonality();
+  }, []);
+
   // Carregar/sincronizar mensagens com o backend quando o componente montar
   useEffect(() => {
     const init = async () => {
@@ -70,9 +122,14 @@ const Chatbot = () => {
       }
 
       const existingId = localStorage.getItem(CONVERSATION_ID_KEY);
+      const token = localStorage.getItem('authToken');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       try {
         if (existingId) {
-          const remote = await fetch(`${API_BASE_URL}/api/conversations/${existingId}`).then(r => r.ok ? r.json() : null);
+          const remote = await fetch(`${API_BASE_URL}/api/conversations/${existingId}`, { headers }).then(r => r.ok ? r.json() : null);
           if (remote && Array.isArray(remote.messages)) {
             const uiMessages = remote.messages.map(m => ({ text: m.text, isUser: m.role === 'user' }));
             setMessages(uiMessages);
@@ -87,7 +144,7 @@ const Chatbot = () => {
           : [];
         const created = await fetch(`${API_BASE_URL}/api/conversations`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ initialMessages })
         }).then(r => r.ok ? r.json() : null);
         if (created && created.id) {
@@ -322,9 +379,14 @@ const Chatbot = () => {
     let id = localStorage.getItem(CONVERSATION_ID_KEY);
     if (id) return id;
     try {
+      const token = localStorage.getItem('authToken');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const created = await fetch(`${API_BASE_URL}/api/conversations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ initialMessages: [] })
       }).then(r => r.ok ? r.json() : null);
       if (created && created.id) {
@@ -339,9 +401,14 @@ const Chatbot = () => {
 
   const createConversationWithMessages = async (initialMessages) => {
     try {
+      const token = localStorage.getItem('authToken');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const created = await fetch(`${API_BASE_URL}/api/conversations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ initialMessages })
       }).then(r => r.ok ? r.json() : null);
       if (created && created.id) {
@@ -357,10 +424,16 @@ const Chatbot = () => {
       let id = await ensureConversation();
       if (!id) return false;
 
+      const token = localStorage.getItem('authToken');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const postMessage = async (convId) => {
         return fetch(`${API_BASE_URL}/api/conversations/${convId}/messages`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ role, text })
         });
       };
@@ -371,7 +444,7 @@ const Chatbot = () => {
         localStorage.removeItem(CONVERSATION_ID_KEY);
         const created = await fetch(`${API_BASE_URL}/api/conversations`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ initialMessages: [] })
         }).then(r => r.ok ? r.json() : null);
         if (created && created.id) {
@@ -538,7 +611,7 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
         });
       }
       
-      const promptComContexto = `${CONTEXTO_INICIAL}\n\n${historicoConversa}\nPergunta atual do usuário: ${message}`;
+      const promptComContexto = `${personality}\n\n${historicoConversa}\nPergunta atual do usuário: ${message}`;
       
       const result = await model.generateContent(promptComContexto);
       const response = await result.response;
@@ -557,12 +630,17 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
     localStorage.removeItem(STORAGE_KEY);
     if (currentId) {
       // tentar excluir conversa atual e criar nova
-      fetch(`${API_BASE_URL}/api/conversations/${currentId}`, { method: 'DELETE' })
+      const token = localStorage.getItem('authToken');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      fetch(`${API_BASE_URL}/api/conversations/${currentId}`, { method: 'DELETE', headers })
         .finally(async () => {
           try {
             const created = await fetch(`${API_BASE_URL}/api/conversations`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers,
               body: JSON.stringify({ initialMessages: [] })
             }).then(r => r.ok ? r.json() : null);
             if (created && created.id) {
@@ -652,10 +730,70 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
     setIsDarkMode(!isDarkMode);
   };
 
+  // Funções de personalidade e autenticação
+  const handleOpenPersonalityModal = async () => {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      window.location.href = '/login';
+      return;
+    }
+
+    setPersonalityEdit(personality);
+    setShowPersonalityModal(true);
+  };
+
+  const handleSavePersonality = async () => {
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+
+    setIsSavingPersonality(true);
+    try {
+      const endpoint = user?.isAdmin ? '/api/personality/global' : '/api/personality/user';
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ personality: personalityEdit })
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao salvar personalidade');
+      }
+
+      setPersonality(personalityEdit);
+      setShowPersonalityModal(false);
+      alert('Personalidade salva com sucesso!');
+    } catch (e) {
+      alert('Erro ao salvar personalidade: ' + e.message);
+    } finally {
+      setIsSavingPersonality(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    setUser(null);
+    // Recarregar personalidade global
+    fetch(`${API_BASE_URL}/api/personality/public`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) setPersonality(data.personality);
+      });
+    window.location.reload();
+  };
+
   // ------- Histórico: listar, selecionar, criar, excluir -------
   const fetchConversations = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/conversations`);
+      const token = localStorage.getItem('authToken');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch(`${API_BASE_URL}/api/conversations`, { headers });
       if (res.status === 404) {
         // backend sem endpoint de listagem; desabilita chamadas futuras
         setSupportsConversationList(false);
@@ -685,9 +823,14 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
 
   const createNewConversation = async () => {
     try {
+      const token = localStorage.getItem('authToken');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const res = await fetch(`${API_BASE_URL}/api/conversations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ initialMessages: [] })
       });
       if (!res.ok) return;
@@ -703,7 +846,12 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
 
   const deleteConversation = async (id) => {
     try {
-      await fetch(`${API_BASE_URL}/api/conversations/${id}`, { method: 'DELETE' });
+      const token = localStorage.getItem('authToken');
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      await fetch(`${API_BASE_URL}/api/conversations/${id}`, { method: 'DELETE', headers });
     } finally {
       const currentId = localStorage.getItem(CONVERSATION_ID_KEY);
       if (currentId === id) {
@@ -718,7 +866,43 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
       <div className="chat-header">
         <img alt="logo" src='/imagens/logo.png' className="avatar"/>
         <h1>Mega Chef da Computaria</h1>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {user && (
+            <>
+              <span style={{ fontSize: '0.9rem', color: isDarkMode ? '#FFB6D9' : '#FF1493', marginRight: '8px' }}>
+                Olá, {user.username}
+              </span>
+              <button 
+                className="clear-button" 
+                onClick={handleOpenPersonalityModal}
+                title={user.isAdmin ? "Editar personalidade global" : "Editar minha personalidade"}
+                style={{ fontSize: '0.85rem' }}
+              >
+                ⚙️ Personalidade
+              </button>
+              <button 
+                className="clear-button" 
+                onClick={handleLogout}
+                title="Sair"
+                style={{ fontSize: '0.85rem' }}
+              >
+                Sair
+              </button>
+            </>
+          )}
+          {!user && (
+            <a href="/login" style={{ 
+              padding: '8px 12px', 
+              background: 'linear-gradient(135deg, #FF69B4 0%, #FF1493 100%)',
+              color: 'white',
+              textDecoration: 'none',
+              borderRadius: '8px',
+              fontSize: '0.85rem',
+              fontWeight: '600'
+            }}>
+              Login
+            </a>
+          )}
           <button className="theme-toggle" onClick={toggleTheme}>
             {isDarkMode ? '☀️' : '🌙'}
           </button>
@@ -770,9 +954,14 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
                     const title = novoTitulo.trim();
                     if (!title) return;
                     try {
+                      const token = localStorage.getItem('authToken');
+                      const headers = { 'Content-Type': 'application/json' };
+                      if (token) {
+                        headers['Authorization'] = `Bearer ${token}`;
+                      }
                       await fetch(`${API_BASE_URL}/api/conversations/${c.id}`, {
                         method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers,
                         body: JSON.stringify({ title })
                       });
                     } finally {
@@ -858,6 +1047,104 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
           )}
         </button>
       </div>
+
+      {/* Modal de Edição de Personalidade */}
+      {showPersonalityModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: isDarkMode ? '#2a1f2e' : 'white',
+            borderRadius: '16px',
+            padding: '24px',
+            width: '90%',
+            maxWidth: '700px',
+            maxHeight: '80vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+          }}>
+            <h2 style={{
+              marginTop: 0,
+              marginBottom: '16px',
+              color: isDarkMode ? '#FFB6D9' : '#FF1493'
+            }}>
+              {user?.isAdmin ? 'Editar Personalidade Global' : 'Editar Minha Personalidade'}
+            </h2>
+            <p style={{
+              fontSize: '0.9rem',
+              color: isDarkMode ? '#ccc' : '#666',
+              marginBottom: '16px'
+            }}>
+              {user?.isAdmin 
+                ? 'Esta personalidade será usada por todos os usuários que não possuem uma personalidade personalizada.' 
+                : 'Personalize o comportamento do bot conforme suas preferências.'}
+            </p>
+            <textarea
+              value={personalityEdit}
+              onChange={(e) => setPersonalityEdit(e.target.value)}
+              style={{
+                flex: 1,
+                minHeight: '300px',
+                padding: '12px',
+                borderRadius: '8px',
+                border: `2px solid ${isDarkMode ? '#FF69B4' : '#FF1493'}`,
+                backgroundColor: isDarkMode ? '#1a0f1e' : '#fff',
+                color: isDarkMode ? '#fff' : '#000',
+                fontSize: '0.95rem',
+                fontFamily: 'inherit',
+                resize: 'vertical',
+                marginBottom: '16px'
+              }}
+              placeholder="Digite as instruções de personalidade do bot..."
+            />
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowPersonalityModal(false)}
+                disabled={isSavingPersonality}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: isDarkMode ? '#444' : '#ddd',
+                  color: isDarkMode ? '#fff' : '#000',
+                  cursor: isSavingPersonality ? 'not-allowed' : 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: '600'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSavePersonality}
+                disabled={isSavingPersonality}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #FF69B4 0%, #FF1493 100%)',
+                  color: 'white',
+                  cursor: isSavingPersonality ? 'not-allowed' : 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  opacity: isSavingPersonality ? 0.6 : 1
+                }}
+              >
+                {isSavingPersonality ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
