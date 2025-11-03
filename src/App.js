@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Chatbot from './components/Chatbot';
 import Login from './components/Login';
+import AdminPanel from './components/AdminPanel';
 import './index.css';
 
 function App() {
@@ -20,6 +21,8 @@ function App() {
     };
   }, []);
 
+  const pathname = window.location.pathname;
+
   return (
     <div className="App">
       {!isOnline && (
@@ -27,11 +30,13 @@ function App() {
           Você está offline. Algumas funcionalidades podem estar indisponíveis.
         </div>
       )}
-      {window.location.pathname !== '/login' && (
+      {pathname !== '/login' && pathname !== '/admin' && (
         <a href="/login" className="admin-access-button">Administrador</a>
       )}
-      {window.location.pathname === '/login' ? (
+      {pathname === '/login' ? (
         <Login />
+      ) : pathname === '/admin' ? (
+        <AdminPanel />
       ) : (
         <Chatbot />
       )}

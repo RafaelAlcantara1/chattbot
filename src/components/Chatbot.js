@@ -55,16 +55,46 @@ const Chatbot = () => {
   const [showPersonalityModal, setShowPersonalityModal] = useState(false);
   const [personalityEdit, setPersonalityEdit] = useState('');
   const [isSavingPersonality, setIsSavingPersonality] = useState(false);
+  const [botAvatar, setBotAvatar] = useState('🍳');
+  const [botBackground, setBotBackground] = useState('default');
   
   // Referências para auto-rolagem e input
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   
-  // Carregar informações do usuário e personalidade
+  // Fundos disponíveis
+  const backgrounds = {
+    default: 'linear-gradient(135deg, #FFB6D9 0%, #FF69B4 50%, #FF1493 100%)',
+    gradient1: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    gradient2: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+    gradient3: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    gradient4: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+    solid1: 'linear-gradient(135deg, #FF69B4 0%, #FF69B4 100%)',
+    solid2: 'linear-gradient(135deg, #667eea 0%, #667eea 100%)'
+  };
+  
+  // Carregar informações do usuário, personalidade e configurações
   useEffect(() => {
     const loadUserAndPersonality = async () => {
       const savedUser = localStorage.getItem('user');
       const token = localStorage.getItem('authToken');
+      
+      // Carregar configurações (avatar e fundo) sempre
+      try {
+        const settingsResponse = await fetch(`${API_BASE_URL}/api/settings`);
+        if (settingsResponse.ok) {
+          const settingsData = await settingsResponse.json();
+          setBotAvatar(settingsData.botAvatar || '🍳');
+          setBotBackground(settingsData.botBackground || 'default');
+          
+          // Aplicar fundo no body
+          const bodyBg = backgrounds[settingsData.botBackground] || backgrounds.default;
+          document.body.style.backgroundImage = 'none';
+          document.body.style.background = bodyBg;
+        }
+      } catch (e) {
+        console.error('Erro ao carregar configurações:', e);
+      }
       
       if (savedUser && token) {
         try {
@@ -106,6 +136,17 @@ const Chatbot = () => {
     
     loadUserAndPersonality();
   }, []);
+  
+  // Aplicar fundo quando botBackground mudar
+  useEffect(() => {
+    const bodyBg = backgrounds[botBackground] || backgrounds.default;
+    document.body.style.backgroundImage = 'none';
+    document.body.style.background = bodyBg;
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundRepeat = 'no-repeat';
+    document.body.style.backgroundAttachment = 'fixed';
+  }, [botBackground]);
 
   // Carregar/sincronizar mensagens com o backend quando o componente montar
   useEffect(() => {
@@ -864,7 +905,9 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
   return (
     <div className={`chat-container ${isDarkMode ? 'dark-mode' : ''}`}>
       <div className="chat-header">
-        <img alt="logo" src='/imagens/logo.png' className="avatar"/>
+        <div className="avatar" style={{ fontSize: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {botAvatar}
+        </div>
         <h1>Mega Chef da Computaria</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {user && (
@@ -880,6 +923,16 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
               >
                 ⚙️ Personalidade
               </button>
+              {user.isAdmin && (
+                <a 
+                  href="/admin"
+                  className="clear-button"
+                  style={{ fontSize: '0.85rem', textDecoration: 'none' }}
+                  title="Painel de Administração"
+                >
+                  🎛️ Admin
+                </a>
+              )}
               <button 
                 className="clear-button" 
                 onClick={handleLogout}
@@ -977,7 +1030,9 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
         <div className="messages-container">
           {messages.length === 0 && (
             <div className="message bot">
-              <img alt="logo" src='/imagens/logo.png' className="avatar"/>
+              <div className="avatar" style={{ fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {botAvatar}
+              </div>
               <div className="message-content">
                 <ReactMarkdown>
                   {MENSAGEM_BOAS_VINDAS}
@@ -989,7 +1044,7 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
           {messages.map((message, index) => (
             <div key={index} className={`message ${message.isUser ? 'user' : 'bot'}`}>
               <div className="avatar">
-                {message.isUser ? <RxAvatar size={30}/> : <img alt="logo" className="avatar" src='/imagens/logo.png'/>}
+                {message.isUser ? <RxAvatar size={30}/> : <div style={{ fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{botAvatar}</div>}
               </div>
               <div className="message-content">
                 <ReactMarkdown>
@@ -1001,7 +1056,9 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
           
           {isLoading && (
             <div className="typing-indicator">
-              <img alt="logo" src='/imagens/logo.png' className="avatar"/>
+              <div className="avatar" style={{ fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {botAvatar}
+              </div>
               <div className="message-content">
                 <span></span>
                 <span></span>

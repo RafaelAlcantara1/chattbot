@@ -59,9 +59,18 @@ const PersonalitySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+const SettingsSchema = new mongoose.Schema(
+  {
+    key: { type: String, required: true, unique: true },
+    value: { type: mongoose.Schema.Types.Mixed, required: true }
+  },
+  { timestamps: true }
+);
+
 const Conversation = mongoose.model('Conversation', ConversationSchema);
 const User = mongoose.model('User', UserSchema);
 const Personality = mongoose.model('Personality', PersonalitySchema);
+const Settings = mongoose.model('Settings', SettingsSchema);
 
 // Middleware de autenticação
 const authenticateToken = (req, res, next) => {
@@ -571,6 +580,91 @@ app.put('/api/personality/global', authenticateToken, async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erro ao atualizar personalidade global' });
+  }
+});
+
+// --- CONFIGURAÇÕES (Settings) ---
+// Obter todas as configurações (público - algumas configurações são públicas)
+app.get('/api/settings', async (req, res) => {
+  try {
+    const avatarSetting = await Settings.findOne({ key: 'botAvatar' });
+    const backgroundSetting = await Settings.findOne({ key: 'botBackground' });
+    
+    res.json({
+      botAvatar: avatarSetting ? avatarSetting.value : '🍳',
+      botBackground: backgroundSetting ? backgroundSetting.value : 'default'
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erro ao obter configurações' });
+  }
+});
+
+// Obter configuração específica (público)
+app.get('/api/settings/:key', async (req, res) => {
+  try {
+    const setting = await Settings.findOne({ key: req.params.key });
+    if (!setting) {
+      // Valores padrão
+      if (req.params.key === 'botAvatar') {
+        return res.json({ key: 'botAvatar', value: '🍳' });
+      }
+      if (req.params.key === 'botBackground') {
+        return res.json({ key: 'botBackground', value: 'default' });
+      }
+      return res.status(404).json({ error: 'Configuração não encontrada' });
+    }
+    res.json({ key: setting.key, value: setting.value });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erro ao obter configuração' });
+  }
+});
+
+// Atualizar configuração (apenas admin)
+app.put('/api/settings/:key', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({ error: 'Acesso negado. Apenas administradores podem alterar configurações.' });
+    }
+    
+    const { value } = req.body || {};
+    if (value === undefined || value === null) {
+      return res.status(400).json({ error: 'value é obrigatório' });
+    }
+    
+    // Validar keys permitidas
+    const allowedKeys = ['botAvatar', 'botBackground'];
+    if (!allowedKeys.includes(req.params.key)) {
+      return res.status(400).json({ error: 'Chave de configuração inválida' });
+    }
+    
+    // Validar avatar (deve ser emoji ou string curta)
+    if (req.params.key === 'botAvatar') {
+      if (typeof value !== 'string' || value.length > 10) {
+        return res.status(400).json({ error: 'Avatar deve ser um emoji ou string curta' });
+      }
+    }
+    
+    // Validar background
+    if (req.params.key === 'botBackground') {
+      const allowedBackgrounds = ['default', 'gradient1', 'gradient2', 'gradient3', 'gradient4', 'solid1', 'solid2'];
+      if (!allowedBackgrounds.includes(value)) {
+        return res.status(400).json({ error: 'Background inválido' });
+      }
+    }
+    
+    const setting = await Settings.findOneAndUpdate(
+      { key: req.params.key },
+      { value },
+      { upsert: true, new: true }
+    );
+    
+    res.json({ ok: true, key: setting.key, value: setting.value });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erro ao atualizar configuração' });
   }
 });
 
