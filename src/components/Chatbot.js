@@ -52,9 +52,6 @@ const Chatbot = () => {
   const [supportsConversationList, setSupportsConversationList] = useState(true);
   const [user, setUser] = useState(null);
   const [personality, setPersonality] = useState(CONTEXTO_INICIAL);
-  const [showPersonalityModal, setShowPersonalityModal] = useState(false);
-  const [personalityEdit, setPersonalityEdit] = useState('');
-  const [isSavingPersonality, setIsSavingPersonality] = useState(false);
   const [botAvatar, setBotAvatar] = useState('🍳');
   const [botBackground, setBotBackground] = useState('default');
   
@@ -771,48 +768,7 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
     setIsDarkMode(!isDarkMode);
   };
 
-  // Funções de personalidade e autenticação
-  const handleOpenPersonalityModal = async () => {
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-      window.location.href = '/login';
-      return;
-    }
-
-    setPersonalityEdit(personality);
-    setShowPersonalityModal(true);
-  };
-
-  const handleSavePersonality = async () => {
-    const token = localStorage.getItem('authToken');
-    if (!token) return;
-
-    setIsSavingPersonality(true);
-    try {
-      const endpoint = user?.isAdmin ? '/api/personality/global' : '/api/personality/user';
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ personality: personalityEdit })
-      });
-
-      if (!response.ok) {
-        throw new Error('Erro ao salvar personalidade');
-      }
-
-      setPersonality(personalityEdit);
-      setShowPersonalityModal(false);
-      alert('Personalidade salva com sucesso!');
-    } catch (e) {
-      alert('Erro ao salvar personalidade: ' + e.message);
-    } finally {
-      setIsSavingPersonality(false);
-    }
-  };
-
+  // Função de logout
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
@@ -915,14 +871,14 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
               <span style={{ fontSize: '0.9rem', color: isDarkMode ? '#FFB6D9' : '#FF1493', marginRight: '8px' }}>
                 Olá, {user.username}
               </span>
-              <button 
-                className="clear-button" 
-                onClick={handleOpenPersonalityModal}
-                title={user.isAdmin ? "Editar personalidade global" : "Editar minha personalidade"}
-                style={{ fontSize: '0.85rem' }}
+              <a 
+                href="/profile"
+                className="clear-button"
+                style={{ fontSize: '0.85rem', textDecoration: 'none' }}
+                title="Meu Perfil"
               >
-                ⚙️ Personalidade
-              </button>
+                👤 Perfil
+              </a>
               {user.isAdmin && (
                 <a 
                   href="/admin"
@@ -1044,7 +1000,13 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
           {messages.map((message, index) => (
             <div key={index} className={`message ${message.isUser ? 'user' : 'bot'}`}>
               <div className="avatar">
-                {message.isUser ? <RxAvatar size={30}/> : <div style={{ fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{botAvatar}</div>}
+                {message.isUser ? (
+                  <div style={{ fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {user?.avatar || '👤'}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{botAvatar}</div>
+                )}
               </div>
               <div className="message-content">
                 <ReactMarkdown>
@@ -1105,103 +1067,6 @@ Para começar, me conte se tem alguma restrição alimentar ou preferência, e o
         </button>
       </div>
 
-      {/* Modal de Edição de Personalidade */}
-      {showPersonalityModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: isDarkMode ? '#2a1f2e' : 'white',
-            borderRadius: '16px',
-            padding: '24px',
-            width: '90%',
-            maxWidth: '700px',
-            maxHeight: '80vh',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
-          }}>
-            <h2 style={{
-              marginTop: 0,
-              marginBottom: '16px',
-              color: isDarkMode ? '#FFB6D9' : '#FF1493'
-            }}>
-              {user?.isAdmin ? 'Editar Personalidade Global' : 'Editar Minha Personalidade'}
-            </h2>
-            <p style={{
-              fontSize: '0.9rem',
-              color: isDarkMode ? '#ccc' : '#666',
-              marginBottom: '16px'
-            }}>
-              {user?.isAdmin 
-                ? 'Esta personalidade será usada por todos os usuários que não possuem uma personalidade personalizada.' 
-                : 'Personalize o comportamento do bot conforme suas preferências.'}
-            </p>
-            <textarea
-              value={personalityEdit}
-              onChange={(e) => setPersonalityEdit(e.target.value)}
-              style={{
-                flex: 1,
-                minHeight: '300px',
-                padding: '12px',
-                borderRadius: '8px',
-                border: `2px solid ${isDarkMode ? '#FF69B4' : '#FF1493'}`,
-                backgroundColor: isDarkMode ? '#1a0f1e' : '#fff',
-                color: isDarkMode ? '#fff' : '#000',
-                fontSize: '0.95rem',
-                fontFamily: 'inherit',
-                resize: 'vertical',
-                marginBottom: '16px'
-              }}
-              placeholder="Digite as instruções de personalidade do bot..."
-            />
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setShowPersonalityModal(false)}
-                disabled={isSavingPersonality}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  backgroundColor: isDarkMode ? '#444' : '#ddd',
-                  color: isDarkMode ? '#fff' : '#000',
-                  cursor: isSavingPersonality ? 'not-allowed' : 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '600'
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSavePersonality}
-                disabled={isSavingPersonality}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'linear-gradient(135deg, #FF69B4 0%, #FF1493 100%)',
-                  color: 'white',
-                  cursor: isSavingPersonality ? 'not-allowed' : 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  opacity: isSavingPersonality ? 0.6 : 1
-                }}
-              >
-                {isSavingPersonality ? 'Salvando...' : 'Salvar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

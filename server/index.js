@@ -45,7 +45,8 @@ const UserSchema = new mongoose.Schema(
   {
     username: { type: String, required: true, unique: true, trim: true },
     password: { type: String, required: true },
-    isAdmin: { type: Boolean, default: false }
+    isAdmin: { type: Boolean, default: false },
+    avatar: { type: String, default: '👤' } // Emoji do avatar do usuário
   },
   { timestamps: true }
 );
@@ -361,7 +362,7 @@ app.post('/api/auth/register', async (req, res) => {
     const user = await User.create({ username, password: hashedPassword });
     
     const token = jwt.sign({ userId: user._id.toString(), username: user.username }, JWT_SECRET, { expiresIn: '30d' });
-    res.status(201).json({ token, user: { id: user._id.toString(), username: user.username, isAdmin: user.isAdmin } });
+    res.status(201).json({ token, user: { id: user._id.toString(), username: user.username, isAdmin: user.isAdmin, avatar: user.avatar } });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erro ao criar usuário' });
@@ -387,7 +388,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
     
     const token = jwt.sign({ userId: user._id.toString(), username: user.username, isAdmin: user.isAdmin }, JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, user: { id: user._id.toString(), username: user.username, isAdmin: user.isAdmin } });
+    res.json({ token, user: { id: user._id.toString(), username: user.username, isAdmin: user.isAdmin, avatar: user.avatar } });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erro ao fazer login' });
@@ -401,7 +402,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
-    res.json({ user: { id: user._id.toString(), username: user.username, isAdmin: user.isAdmin } });
+    res.json({ user: { id: user._id.toString(), username: user.username, isAdmin: user.isAdmin, avatar: user.avatar } });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erro ao verificar usuário' });
@@ -665,6 +666,32 @@ app.put('/api/settings/:key', authenticateToken, async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erro ao atualizar configuração' });
+  }
+});
+
+// --- PERFIL DO USUÁRIO ---
+// Atualizar avatar do usuário
+app.put('/api/user/avatar', authenticateToken, async (req, res) => {
+  try {
+    const { avatar } = req.body || {};
+    if (!avatar || typeof avatar !== 'string' || avatar.length > 10) {
+      return res.status(400).json({ error: 'Avatar deve ser um emoji ou string curta (máx 10 caracteres)' });
+    }
+    
+    const user = await User.findByIdAndUpdate(
+      req.user.userId,
+      { $set: { avatar } },
+      { new: true }
+    );
+    
+    if (!user) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+    
+    res.json({ ok: true, user: { id: user._id.toString(), username: user.username, isAdmin: user.isAdmin, avatar: user.avatar } });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erro ao atualizar avatar' });
   }
 });
 
