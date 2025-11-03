@@ -24,6 +24,16 @@ function Login() {
         body: JSON.stringify({ username: nome, password: senha })
       });
 
+      // Verificar se a resposta é JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        // Se não for JSON, pode ser uma página de erro HTML
+        if (response.status === 404) {
+          throw new Error('Endpoint não encontrado. O servidor precisa ser atualizado com os novos endpoints de autenticação.');
+        }
+        throw new Error(`Erro do servidor (${response.status}). Verifique se o servidor está rodando e atualizado.`);
+      }
+
       const data = await response.json();
 
       if (!response.ok) {
