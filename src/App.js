@@ -28,7 +28,7 @@ function App() {
     <div className="App">
       {!isOnline && (
         <div className="offline-notification">
-          Você está offline. Algumas funcionalidades podem estar indisponíveis.
+          Você está offline.
         </div>
       )}
       {pathname === '/login' ? (
